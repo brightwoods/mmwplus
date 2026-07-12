@@ -195,11 +195,9 @@ https://gistcdn.githack.com/brightwoods/8f89bcc1845a365da50f0c52d882efab/raw/mel
 
 ▶ 스밍이 계속 되면서 검은화면만 출력 됩니다.
 
-<br>
-
 ##
 
-<br>
+<br><br>
 
 ## iOS (Safari 브라우저)
 
