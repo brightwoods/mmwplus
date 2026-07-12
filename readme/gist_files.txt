@@ -1,0 +1,8 @@
+http://hades905.mooo.com/userscripts/melon_musicwave_helper.user.js
+https://gistcdn.githack.com/brightwoods/8f89bcc1845a365da50f0c52d882efab/raw/melon_musicwave_helper.user.js
+https://gistcdn.githack.com/brightwoods/ca912f84e591e16848ac17f1768f2fa3/raw/mmw_auth_plugin.js
+
+Origin:
+https://gist.github.com/brightwoods/8f89bcc1845a365da50f0c52d882efab/raw/melon_musicwave_helper.user.js
+https://gist.github.com/brightwoods/ca912f84e591e16848ac17f1768f2fa3/raw/mmw_auth_plugin.js
+https://gist.github.com/brightwoods/c37215fe6e98f6a9d3cb6119c83d9f7b/raw/mmw_recovery_plugin.js
