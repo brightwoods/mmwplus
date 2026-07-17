@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         멜론 뮤직웨이브 플러스 (Core)
 // @namespace    https://musicwave.melon.com/
-// @version      2.8.0
+// @version      2.8.2
 // @description  볼륨/알람/백그라운드 + 통신복구 + 외부 플러그인 로더 (GM 저장소 공유, iOS 대응)
 // @author       봉준 무수 하데스 팬카페 [미월신금]
 // @match        https://musicwave.melon.com/musicwave.htm*
@@ -32,7 +32,7 @@
 (function () {
     'use strict';
 
-    const CORE_VERSION = '2.8.0';
+    const CORE_VERSION = '2.8.2';
 
     /* =========================================================
      * 환경(OS) 감지
@@ -51,7 +51,7 @@
     })();
 
     const REMOTE = {
-        requestApi: 'http://hades905.mooo.com/mmw/api/request.php',
+        requestApiPath: 'hades905.mooo.com/mmw/api/request.php',
         authPlugin: 'https://gistcdn.githack.com/brightwoods/ca912f84e591e16848ac17f1768f2fa3/raw/mmw_auth_plugin.js',
     };
 
@@ -186,6 +186,12 @@
                 ontimeout: () => { Logger.err('HTTP 타임아웃'); reject(new Error('timeout')); },
             });
         });
+    }
+
+    function getRequestApiCandidates() {
+        const raw = String(REMOTE.requestApiPath || REMOTE.requestApi || '').trim();
+        const normalized = raw.replace(/^https?:\/\//i, '');
+        return [`https://${normalized}`, `http://${normalized}`];
     }
 
     /* =========================================================
@@ -561,12 +567,38 @@
         },
         async fetchFromServer(userId) {
             Logger.log(`서버 플러그인 요청. userId=${userId} / os=${Env.osParam}`);
-            const res = await httpRequest({
-                method: 'POST',
-                url: REMOTE.requestApi,
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                data: `client_hash=${encodeURIComponent(userId)}&os=${encodeURIComponent(Env.osParam)}`,
-            });
+            const requestUrls = getRequestApiCandidates();
+            const requestData = `client_hash=${encodeURIComponent(userId)}&os=${encodeURIComponent(Env.osParam)}`;
+            let res = null;
+            let lastError = null;
+
+            UI.setServerConnectFailed(false);
+
+            for (const url of requestUrls) {
+                try {
+                    Logger.log(`서버 접속 시도: ${url}`);
+                    res = await httpRequest({
+                        method: 'POST',
+                        url,
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        data: requestData,
+                    });
+                    Logger.log(`서버 접속 성공: ${url}`);
+                    lastError = null;
+                    break;
+                } catch (e) {
+                    lastError = e;
+                    Logger.warn(`서버 접속 실패: ${url}`, e);
+                }
+            }
+
+            if (!res) {
+                UI.setServerConnectFailed(true);
+                throw lastError || new Error('hades905 서버접속 실패');
+            }
+
+            UI.setServerConnectFailed(false);
+
             let json;
             try { json = JSON.parse(res.responseText); }
             catch (e) { Logger.err('서버 응답 원문:', (res.responseText || '').slice(0, 200)); throw new Error('JSON 파싱 실패'); }
@@ -627,6 +659,8 @@
 #mwu-fab{width:35px;height:35px;border-radius:50%;cursor:pointer;border:none;color:#fff;font-size:20px;font-weight:700;background:radial-gradient(circle at 30% 30%,#2ec96b,#0a8f43);box-shadow:0 4px 14px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center}
 #mwu-root.mwu-alarm #mwu-fab{background:radial-gradient(circle at 30% 30%,#ff6b6b,#b02020);animation:mwuPulse 1s infinite}
 @keyframes mwuPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+#mwu-server-fail{position:absolute;right:0;bottom:72px;background:#5a1a1a;color:#ffd6d6;font-size:11px;font-weight:700;padding:4px 8px;border-radius:8px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);display:none}
+#mwu-server-fail.show{display:block}
 #mwu-auth-badge{position:absolute;right:0;bottom:42px;background:#b02020;color:#fff;font-size:11px;font-weight:700;padding:4px 8px;border-radius:8px;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);display:none}
 #mwu-auth-badge.show{display:block}
 #mwu-panel{position:absolute;right:0;bottom:46px;width:130px;padding:12px 10px;border-radius:14px;background:#15181b;border:1px solid rgba(46,201,107,.35);box-shadow:0 14px 36px rgba(0,0,0,.55);text-align:center;display:none;max-height:100vh;overflow-y:auto}
@@ -672,6 +706,7 @@
 <div class="mwu-sec"><label class="mwu-check"><input id="mwu-alarm-enabled" type="checkbox"> 재생실패 알람</label><button class="mwu-btn" id="mwu-alarm-stop">알림음 정지</button></div>`;
 
             document.body.insertAdjacentHTML('beforeend', `<div id="mwu-root">
+<div id="mwu-server-fail">hades905 서버접속 실패</div>
 <div id="mwu-auth-badge">인증 필요 (기능제한)</div>
 <div id="mwu-panel">
 ${Env.isIOS ? iosNote : desktopVolUI}
@@ -731,6 +766,10 @@ ${Env.isIOS ? iosNote : desktopVolUI}
         setAuthNeeded(need) {
             const b = document.getElementById('mwu-auth-badge');
             if (b) b.classList.toggle('show', !!need);
+        },
+        setServerConnectFailed(failed) {
+            const e = document.getElementById('mwu-server-fail');
+            if (e) e.classList.toggle('show', !!failed);
         },
         updateVolume() {
             if (Env.isIOS) return;
